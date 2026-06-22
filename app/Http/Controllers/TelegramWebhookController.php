@@ -30,11 +30,14 @@ class TelegramWebhookController extends Controller
         $message = data_get($payload, 'message') ?? data_get($payload, 'edited_message');
         $chatId = data_get($message, 'chat.id');
         $text = data_get($message, 'text');
+        $chatId = $chatId ? (string) $chatId : null;
+        $commandChatId = config('services.telegram.command_chat_id');
+        $commandChatId = $commandChatId ? (string) $commandChatId : null;
 
         $update = TelegramUpdate::query()->updateOrCreate(
             ['update_id' => (string) data_get($payload, 'update_id')],
             [
-                'message_chat_id' => $chatId ? (string) $chatId : null,
+                'message_chat_id' => $chatId,
                 'message_text' => $text,
                 'payload' => $payload,
                 'processed_at' => Carbon::now(),
@@ -49,11 +52,27 @@ class TelegramWebhookController extends Controller
             'status' => 'processed',
         ]);
 
-        $reply = $this->commands->handle($chatId ? (string) $chatId : null, is_string($text) ? $text : null);
+        if ($commandChatId && $chatId !== $commandChatId) {
+            IntegrationEvent::query()->create([
+                'provider' => 'telegram',
+                'type' => 'webhook.ignored_chat',
+                'external_id' => $update->update_id,
+                'payload' => [
+                    'chat_id' => $chatId,
+                    'allowed_chat_id' => $commandChatId,
+                ],
+                'status' => 'ignored',
+            ]);
 
-        if ($chatId && $reply) {
+            return response()->json(['ok' => true]);
+        }
+
+        $reply = $this->commands->handle($chatId, is_string($text) ? $text : null);
+        $replyChatId = $commandChatId ?: $chatId;
+
+        if ($replyChatId && $reply) {
             try {
-                $this->telegram->sendMessage((string) $chatId, $reply);
+                $this->telegram->sendMessage($replyChatId, $reply);
             } catch (\Throwable $exception) {
                 Log::warning('Telegram command reply failed', [
                     'update_id' => $update->update_id,

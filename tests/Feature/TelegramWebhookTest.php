@@ -59,6 +59,7 @@ class TelegramWebhookTest extends TestCase
     {
         config([
             'services.telegram.bot_token' => 'telegram-token',
+            'services.telegram.command_chat_id' => null,
             'services.amocrm.base_domain' => 'example.amocrm.ru',
             'services.amocrm.max_export_batch' => 100,
         ]);
@@ -130,5 +131,47 @@ class TelegramWebhookTest extends TestCase
             && str_contains($request['text'], 'Создано новых сделок: 1')
             && str_contains($request['text'], 'Обновлено дублей: 1')
             && str_contains($request['text'], 'ID сделок amoCRM: 101, 102'));
+    }
+
+    public function test_it_ignores_commands_from_unconfigured_chat(): void
+    {
+        config([
+            'services.telegram.bot_token' => 'telegram-token',
+            'services.telegram.command_chat_id' => '-5452931046',
+        ]);
+
+        Seller::create([
+            'seller_id' => 'seller-1',
+            'deal_name' => 'Lead 1',
+        ]);
+
+        $this->mock(AmoCrmClient::class)
+            ->shouldNotReceive('createLeadFromSeller');
+
+        Http::fake([
+            'https://api.telegram.org/bottelegram-token/sendMessage' => Http::response(['ok' => true]),
+        ]);
+
+        $this->postJson('/api/telegram/webhook', [
+            'update_id' => 10004,
+            'message' => [
+                'chat' => ['id' => 555],
+                'text' => '/upload 1',
+            ],
+        ])->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertDatabaseHas(Seller::class, [
+            'seller_id' => 'seller-1',
+            'is_exported' => false,
+        ]);
+
+        $this->assertDatabaseHas(IntegrationEvent::class, [
+            'provider' => 'telegram',
+            'type' => 'webhook.ignored_chat',
+            'external_id' => '10004',
+            'status' => 'ignored',
+        ]);
+
+        Http::assertNothingSent();
     }
 }
