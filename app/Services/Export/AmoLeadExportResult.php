@@ -1,0 +1,61 @@
+<?php
+
+namespace App\Services\Export;
+
+class AmoLeadExportResult
+{
+    public function __construct(
+        public readonly int $requested,
+        public readonly int $selected,
+        public readonly int $exported,
+        public readonly int $failed,
+        public readonly array $leadIds = [],
+        public readonly ?string $error = null,
+        public readonly int $created = 0,
+        public readonly int $updated = 0,
+    ) {
+    }
+
+    public function message(): string
+    {
+        if ($this->selected === 0) {
+            return implode(PHP_EOL, [
+                'Отчет по выгрузке amoCRM',
+                "Запрошено: {$this->requested}",
+                'Найдено: 0',
+                'Статус: нет невыгруженных записей в sellers.',
+            ]);
+        }
+
+        $lines = [
+            'Отчет по выгрузке amoCRM',
+            "Запрошено: {$this->requested}",
+            "Взято из БД: {$this->selected}",
+            "Успешно загружено: {$this->exported}",
+            "Создано новых сделок: {$this->created}",
+            "Обновлено дублей: {$this->updated}",
+            "Ошибок: {$this->failed}",
+        ];
+
+        if ($this->leadIds !== []) {
+            $leadIds = array_values(array_filter($this->leadIds));
+            $shownLeadIds = array_slice($leadIds, 0, 20);
+
+            if ($shownLeadIds !== []) {
+                $lines[] = 'ID сделок amoCRM: '.implode(', ', $shownLeadIds);
+            }
+
+            if (count($leadIds) > count($shownLeadIds)) {
+                $lines[] = 'Еще ID сделок: '.(count($leadIds) - count($shownLeadIds));
+            }
+        }
+
+        if ($this->error) {
+            $lines[] = 'Ошибка: '.$this->error;
+        }
+
+        $lines[] = $this->failed > 0 ? 'Статус: завершено с ошибками.' : 'Статус: успешно.';
+
+        return implode(PHP_EOL, $lines);
+    }
+}
