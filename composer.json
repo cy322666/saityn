@@ -10,7 +10,7 @@
         "amocrm/amocrm-api-library": "^1.15",
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
-        "openspout/openspout": "^5.7"
+        "openspout/openspout": "^4.28.5"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -66,6 +66,12 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.2.31"
+        },
+        "audit": {
+            "block-insecure": false
         }
     },
     "minimum-stability": "stable",
