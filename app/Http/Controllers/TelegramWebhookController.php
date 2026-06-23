@@ -22,7 +22,7 @@ class TelegramWebhookController extends Controller
     {
         $expectedSecret = config('services.telegram.webhook_secret');
 
-        if ($expectedSecret && $request->header('X-Telegram-Bot-Api-Secret-Token') !== $expectedSecret) {
+        if ($expectedSecret && $request->hдеeader('X-Telegram-Bot-Api-Secret-Token') !== $expectedSecret) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
