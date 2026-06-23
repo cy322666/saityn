@@ -222,6 +222,10 @@ class ImportSellers extends Command
             return null;
         }
 
+        if (in_array($column, $this->dateColumns, true)) {
+            return $this->normalizeDateValue($value);
+        }
+
         if (in_array($column, $this->numericColumns, true)) {
             $number = str_replace([' ', ','], ['', '.'], (string) $value);
 
@@ -233,6 +237,45 @@ class ImportSellers extends Command
         }
 
         return is_scalar($value) ? (string) $value : json_encode($value, JSON_UNESCAPED_UNICODE);
+    }
+
+    private function normalizeDateValue(mixed $value): ?string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance($value)->toDateString();
+        }
+
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $value = trim(preg_split('/[|;,\\n]+/u', $value)[0] ?? $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $number = str_replace([' ', ','], ['', '.'], $value);
+
+        if (is_numeric($number)) {
+            $serial = (int) $number;
+
+            if ($serial > 20000 && $serial < 60000) {
+                return Carbon::create(1899, 12, 30)->addDays($serial)->toDateString();
+            }
+        }
+
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
