@@ -67,20 +67,34 @@ class TelegramWebhookController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        $reply = $this->commands->handle($chatId, is_string($text) ? $text : null);
-        $replyChatId = $commandChatId ?: $chatId;
-
-        if ($replyChatId && $reply) {
-            try {
-                $this->telegram->sendMessage($replyChatId, $reply);
-            } catch (\Throwable $exception) {
-                Log::warning('Telegram command reply failed', [
-                    'update_id' => $update->update_id,
-                    'message' => $exception->getMessage(),
-                ]);
-            }
-        }
+        defer(fn () => $this->processCommandAfterResponse(
+            $update->update_id,
+            $chatId,
+            is_string($text) ? $text : null,
+            $commandChatId,
+        ));
 
         return response()->json(['ok' => true]);
+    }
+
+    private function processCommandAfterResponse(
+        string $updateId,
+        ?string $chatId,
+        ?string $text,
+        ?string $commandChatId,
+    ): void {
+        try {
+            $reply = $this->commands->handle($chatId, $text);
+            $replyChatId = $commandChatId ?: $chatId;
+
+            if ($replyChatId && $reply) {
+                $this->telegram->sendMessage($replyChatId, $reply);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Telegram command processing failed', [
+                'update_id' => $updateId,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 }

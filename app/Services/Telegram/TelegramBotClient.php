@@ -75,6 +75,8 @@ class TelegramBotClient
 
         return Http::baseUrl("https://api.telegram.org/bot{$token}")
             ->acceptJson()
-            ->asJson();
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(20);
     }
 }
