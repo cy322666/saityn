@@ -32,6 +32,28 @@ class TelegramBotClient
         return $this->post('deleteWebhook');
     }
 
+    /**
+     * @param array<int, array{command: string, description: string}> $commands
+     */
+    public function setMyCommands(array $commands): array
+    {
+        return $this->post('setMyCommands', [
+            'commands' => $commands,
+            'scope' => [
+                'type' => 'default',
+            ],
+        ]);
+    }
+
+    public function deleteMyCommands(): array
+    {
+        return $this->post('deleteMyCommands', [
+            'scope' => [
+                'type' => 'default',
+            ],
+        ]);
+    }
+
     private function post(string $method, array $payload = []): array
     {
         $response = $this->http()->post($method, $payload)->throw()->json();
@@ -56,4 +78,3 @@ class TelegramBotClient
             ->asJson();
     }
 }
-
