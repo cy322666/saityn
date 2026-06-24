@@ -34,23 +34,23 @@ class TelegramBotClient
 
     /**
      * @param array<int, array{command: string, description: string}> $commands
+     * @param array<string, mixed>|null $scope
      */
-    public function setMyCommands(array $commands): array
+    public function setMyCommands(array $commands, ?array $scope = null): array
     {
         return $this->post('setMyCommands', [
             'commands' => $commands,
-            'scope' => [
-                'type' => 'default',
-            ],
+            'scope' => $scope ?? ['type' => 'default'],
         ]);
     }
 
-    public function deleteMyCommands(): array
+    /**
+     * @param array<string, mixed>|null $scope
+     */
+    public function deleteMyCommands(?array $scope = null): array
     {
         return $this->post('deleteMyCommands', [
-            'scope' => [
-                'type' => 'default',
-            ],
+            'scope' => $scope ?? ['type' => 'default'],
         ]);
     }
 
