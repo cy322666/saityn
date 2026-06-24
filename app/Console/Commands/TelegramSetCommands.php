@@ -32,19 +32,7 @@ class TelegramSetCommands extends Command
                 'description' => 'Проверить подключение бота',
             ],
             [
-                'command' => 'help',
-                'description' => 'Показать доступные команды',
-            ],
-            [
                 'command' => 'upload',
-                'description' => 'Выгрузить N sellers в amoCRM',
-            ],
-            [
-                'command' => 'amo',
-                'description' => 'Выгрузить N sellers в amoCRM',
-            ],
-            [
-                'command' => 'load',
                 'description' => 'Выгрузить N sellers в amoCRM',
             ],
         ];
