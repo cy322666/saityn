@@ -6,6 +6,7 @@ use App\Models\Seller;
 use DateTimeInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
@@ -61,6 +62,8 @@ class ImportSellers extends Command
 
             return self::FAILURE;
         }
+
+        $this->ensureMysqlImportColumnTypes();
 
         if ($this->option('truncate')) {
             Seller::query()->truncate();
@@ -279,6 +282,81 @@ class ImportSellers extends Command
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function ensureMysqlImportColumnTypes(): void
+    {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
+        $table = 'sellers';
+        $longTextColumns = $this->mysqlLongTextColumns();
+        $columns = DB::select(
+            'select COLUMN_NAME, DATA_TYPE from information_schema.COLUMNS where TABLE_SCHEMA = DATABASE() and TABLE_NAME = ?',
+            [$table],
+        );
+
+        $types = [];
+
+        foreach ($columns as $column) {
+            $types[$column->COLUMN_NAME] = strtolower((string) $column->DATA_TYPE);
+        }
+
+        $columnsToAlter = array_values(array_filter(
+            $longTextColumns,
+            fn (string $column) => isset($types[$column]) && ! in_array($types[$column], ['text', 'mediumtext', 'longtext'], true),
+        ));
+
+        if ($columnsToAlter === []) {
+            return;
+        }
+
+        $this->warn('Fixing MySQL sellers text columns before import: '.implode(', ', $columnsToAlter));
+        $this->dropMysqlIndexesForColumns($table, $columnsToAlter);
+
+        foreach ($columnsToAlter as $column) {
+            DB::statement('ALTER TABLE '.$this->quoteMysqlIdentifier($table).' MODIFY '.$this->quoteMysqlIdentifier($column).' MEDIUMTEXT NULL');
+        }
+    }
+
+    /**
+     * @return string[]
+     */
+    private function mysqlLongTextColumns(): array
+    {
+        $excludedColumns = array_merge(
+            ['seller_id', 'ogrn', 'inn', 'lead_id', 'contact_id', 'company_id', 'is_exported'],
+            $this->dateColumns,
+            $this->numericColumns,
+        );
+
+        return array_values(array_diff(array_unique(array_values(Seller::COLUMN_MAP)), $excludedColumns));
+    }
+
+    /**
+     * @param string[] $columns
+     */
+    private function dropMysqlIndexesForColumns(string $table, array $columns): void
+    {
+        if ($columns === []) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($columns), '?'));
+        $indexes = DB::select(
+            "select distinct INDEX_NAME from information_schema.STATISTICS where TABLE_SCHEMA = DATABASE() and TABLE_NAME = ? and COLUMN_NAME in ({$placeholders}) and INDEX_NAME <> 'PRIMARY'",
+            array_merge([$table], $columns),
+        );
+
+        foreach ($indexes as $index) {
+            DB::statement('ALTER TABLE '.$this->quoteMysqlIdentifier($table).' DROP INDEX '.$this->quoteMysqlIdentifier((string) $index->INDEX_NAME));
+        }
+    }
+
+    private function quoteMysqlIdentifier(string $identifier): string
+    {
+        return '`'.str_replace('`', '``', $identifier).'`';
     }
 
     /**
