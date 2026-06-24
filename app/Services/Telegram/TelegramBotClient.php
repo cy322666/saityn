@@ -73,9 +73,19 @@ class TelegramBotClient
             throw new RuntimeException('Telegram bot token is not configured.');
         }
 
+        $options = [];
+
+        if (defined('CURLOPT_IPRESOLVE') && defined('CURL_IPRESOLVE_V4')) {
+            $options['curl'] = [
+                CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+            ];
+        }
+
         return Http::baseUrl("https://api.telegram.org/bot{$token}")
             ->acceptJson()
             ->asJson()
+            ->withOptions($options)
+            ->retry(2, 500)
             ->connectTimeout(5)
             ->timeout(20);
     }

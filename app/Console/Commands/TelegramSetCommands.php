@@ -56,21 +56,10 @@ class TelegramSetCommands extends Command
      */
     private function scopes(): array
     {
-        $scopes = [
+        return [
             'default' => ['type' => 'default'],
             'private chats' => ['type' => 'all_private_chats'],
             'group chats' => ['type' => 'all_group_chats'],
         ];
-
-        $chatId = config('services.telegram.command_chat_id');
-
-        if ($chatId) {
-            $scopes['command chat'] = [
-                'type' => 'chat',
-                'chat_id' => (string) $chatId,
-            ];
-        }
-
-        return $scopes;
     }
 }
