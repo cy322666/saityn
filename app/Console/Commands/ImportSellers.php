@@ -69,6 +69,7 @@ class ImportSellers extends Command
 
         $chunkSize = max(1, (int) $this->option('chunk'));
         $limit = $this->option('limit') ? max(1, (int) $this->option('limit')) : null;
+        $insertOnly = (bool) $this->option('truncate');
         $reader = $this->readerFor($file);
         $startedAt = microtime(true);
         $imported = 0;
@@ -107,7 +108,8 @@ class ImportSellers extends Command
                     $imported++;
 
                     if (count($batch) >= $chunkSize) {
-                        $this->flush($batch);
+                        $this->line("Writing {$imported} rows...");
+                        $this->flush($batch, $insertOnly);
                         $batch = [];
                         $this->line("Imported {$imported} rows...");
                     }
@@ -117,7 +119,8 @@ class ImportSellers extends Command
             }
 
             if ($batch !== []) {
-                $this->flush($batch);
+                $this->line("Writing {$imported} rows...");
+                $this->flush($batch, $insertOnly);
             }
         } finally {
             $reader->close();
@@ -281,8 +284,14 @@ class ImportSellers extends Command
     /**
      * @param array<int, array<string, mixed>> $batch
      */
-    private function flush(array $batch): void
+    private function flush(array $batch, bool $insertOnly = false): void
     {
+        if ($insertOnly) {
+            Seller::insert($batch);
+
+            return;
+        }
+
         $withSellerId = array_values(array_filter($batch, fn (array $row) => ! empty($row['seller_id'])));
         $withoutSellerId = array_values(array_filter($batch, fn (array $row) => empty($row['seller_id'])));
 
