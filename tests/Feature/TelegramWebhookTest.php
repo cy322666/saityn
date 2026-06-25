@@ -6,6 +6,7 @@ use App\Models\IntegrationEvent;
 use App\Models\Seller;
 use App\Models\TelegramUpdate;
 use App\Services\AmoCrm\AmoCrmClient;
+use App\Services\Telegram\TelegramBotClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -173,5 +174,38 @@ class TelegramWebhookTest extends TestCase
         ]);
 
         Http::assertNothingSent();
+    }
+
+    public function test_pending_processor_resends_saved_reports_even_without_new_updates(): void
+    {
+        $event = IntegrationEvent::create([
+            'provider' => 'telegram',
+            'type' => 'report.send_failed',
+            'external_id' => '10005',
+            'payload' => [
+                'reply_chat_id' => '-5452931046',
+                'reply' => 'Saved report',
+                'source_event_id' => 123,
+            ],
+            'status' => 'failed',
+            'error' => 'Previous timeout',
+        ]);
+
+        $this->mock(TelegramBotClient::class)
+            ->shouldReceive('sendMessage')
+            ->once()
+            ->with('-5452931046', 'Saved report')
+            ->andReturn(['ok' => true]);
+
+        $this->artisan('telegram:process-pending', ['--limit' => 10])
+            ->expectsOutput('No pending Telegram updates.')
+            ->expectsOutput("Report event {$event->id} sent.")
+            ->assertSuccessful();
+
+        $this->assertDatabaseHas(IntegrationEvent::class, [
+            'id' => $event->id,
+            'status' => 'processed',
+            'error' => null,
+        ]);
     }
 }

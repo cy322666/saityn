@@ -23,6 +23,7 @@ class TelegramProcessPending extends Command
 
         if ($updates->isEmpty()) {
             $this->info('No pending Telegram updates.');
+            $this->resendFailedReports($limit);
 
             return self::SUCCESS;
         }
@@ -33,11 +34,16 @@ class TelegramProcessPending extends Command
             $this->output->write(Artisan::output());
         }
 
-        Artisan::call('telegram:resend-reports', ['--limit' => $limit]);
-        $this->output->write(Artisan::output());
+        $this->resendFailedReports($limit);
 
         $this->info("Processed {$updates->count()} Telegram updates.");
 
         return self::SUCCESS;
+    }
+
+    private function resendFailedReports(int $limit): void
+    {
+        Artisan::call('telegram:resend-reports', ['--limit' => $limit]);
+        $this->output->write(Artisan::output());
     }
 }
