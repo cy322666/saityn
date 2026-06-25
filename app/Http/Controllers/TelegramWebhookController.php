@@ -21,6 +21,26 @@ class TelegramWebhookController extends Controller
         }
 
         $payload = $request->all();
+
+        if (function_exists('fastcgi_finish_request') && ! app()->runningUnitTests()) {
+            response()->json(['ok' => true])->send();
+            fastcgi_finish_request();
+
+            $this->storeAndDispatch($payload);
+
+            exit;
+        }
+
+        $this->storeAndDispatch($payload);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function storeAndDispatch(array $payload): void
+    {
         $message = data_get($payload, 'message') ?? data_get($payload, 'edited_message');
         $chatId = data_get($message, 'chat.id');
         $text = data_get($message, 'text');
@@ -58,12 +78,10 @@ class TelegramWebhookController extends Controller
                 'status' => 'ignored',
             ]);
 
-            return response()->json(['ok' => true]);
+            return;
         }
 
         $this->startBackgroundProcessor($update->update_id);
-
-        return response()->json(['ok' => true]);
     }
 
     private function startBackgroundProcessor(string $updateId): void
