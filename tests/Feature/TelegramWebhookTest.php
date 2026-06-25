@@ -131,7 +131,52 @@ class TelegramWebhookTest extends TestCase
             && str_contains($request['text'], 'Успешно загружено: 2')
             && str_contains($request['text'], 'Создано новых сделок: 1')
             && str_contains($request['text'], 'Обновлено дублей: 1')
-            && str_contains($request['text'], 'ID сделок amoCRM: 101, 102'));
+            && ! str_contains($request['text'], 'ID сделок amoCRM'));
+    }
+
+    public function test_upload_command_defaults_to_ten_and_caps_requested_count(): void
+    {
+        config([
+            'services.telegram.bot_token' => 'telegram-token',
+            'services.telegram.command_chat_id' => null,
+            'services.amocrm.base_domain' => 'example.amocrm.ru',
+            'services.amocrm.max_export_batch' => 100,
+        ]);
+
+        for ($i = 1; $i <= 12; $i++) {
+            Seller::create([
+                'seller_id' => "seller-{$i}",
+                'deal_name' => "Lead {$i}",
+            ]);
+        }
+
+        $this->mock(AmoCrmClient::class)
+            ->shouldReceive('createLeadFromSeller')
+            ->times(10)
+            ->andReturnUsing(fn (Seller $seller) => [
+                'lead_id' => 1000 + $seller->id,
+                'contact_id' => null,
+                'company_id' => null,
+                'action' => 'created',
+            ]);
+
+        Http::fake([
+            'https://api.telegram.org/bottelegram-token/sendMessage' => Http::response(['ok' => true]),
+        ]);
+
+        $this->postJson('/api/telegram/webhook', [
+            'update_id' => 10005,
+            'message' => [
+                'chat' => ['id' => 555],
+                'text' => '/upload 999',
+            ],
+        ])->assertOk()->assertJson(['ok' => true]);
+
+        $this->assertSame(10, Seller::where('is_exported', true)->count());
+
+        Http::assertSent(fn ($request) => str_contains($request['text'], 'Запрошено: 10')
+            && str_contains($request['text'], 'Успешно загружено: 10')
+            && ! str_contains($request['text'], 'ID сделок amoCRM'));
     }
 
     public function test_it_ignores_commands_from_unconfigured_chat(): void

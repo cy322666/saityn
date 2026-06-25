@@ -34,17 +34,19 @@ class TelegramCommandHandler
 
     private function export(string $arguments): string
     {
-        if (! preg_match('/^\s*(\d+)\s*$/u', $arguments, $matches)) {
+        if (trim($arguments) === '') {
+            $count = 10;
+        } elseif (preg_match('/^\s*(\d+)\s*$/u', $arguments, $matches)) {
+            $count = (int) $matches[1];
+        } else {
             return 'Укажите количество записей, например: /upload 10';
         }
-
-        $count = (int) $matches[1];
 
         if ($count < 1) {
             return 'Количество должно быть больше нуля.';
         }
 
-        return $this->exporter->exportPending($count)->message();
+        return $this->exporter->exportPending(min($count, 10))->message();
     }
 
     /**

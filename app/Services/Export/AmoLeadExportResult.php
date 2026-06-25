@@ -37,19 +37,6 @@ class AmoLeadExportResult
             "Ошибок: {$this->failed}",
         ];
 
-        if ($this->leadIds !== []) {
-            $leadIds = array_values(array_filter($this->leadIds));
-            $shownLeadIds = array_slice($leadIds, 0, 20);
-
-            if ($shownLeadIds !== []) {
-                $lines[] = 'ID сделок amoCRM: '.implode(', ', $shownLeadIds);
-            }
-
-            if (count($leadIds) > count($shownLeadIds)) {
-                $lines[] = 'Еще ID сделок: '.(count($leadIds) - count($shownLeadIds));
-            }
-        }
-
         if ($this->error) {
             $lines[] = 'Ошибка: '.$this->error;
         }
