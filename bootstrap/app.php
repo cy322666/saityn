@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         App\Console\Commands\ImportSellers::class,
         App\Console\Commands\TelegramProcessPending::class,
         App\Console\Commands\TelegramProcessUpdate::class,
+        App\Console\Commands\TelegramResendReports::class,
         App\Console\Commands\TelegramSendTest::class,
         App\Console\Commands\TelegramSetCommands::class,
         App\Console\Commands\TelegramSetWebhook::class,

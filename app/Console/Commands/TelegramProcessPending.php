@@ -33,6 +33,9 @@ class TelegramProcessPending extends Command
             $this->output->write(Artisan::output());
         }
 
+        Artisan::call('telegram:resend-reports', ['--limit' => $limit]);
+        $this->output->write(Artisan::output());
+
         $this->info("Processed {$updates->count()} Telegram updates.");
 
         return self::SUCCESS;

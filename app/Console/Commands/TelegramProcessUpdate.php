@@ -40,23 +40,25 @@ class TelegramProcessUpdate extends Command
             $reply = $commands->handle($chatId, $update->message_text);
             $replyChatId = $commandChatId ?: $chatId;
 
-            if ($replyChatId && $reply) {
-                $telegram->sendMessage($replyChatId, $reply);
-            }
-
             $update->forceFill(['processed_at' => Carbon::now()])->save();
 
-            IntegrationEvent::query()->create([
+            $event = IntegrationEvent::query()->create([
                 'provider' => 'telegram',
                 'type' => 'command.processed',
                 'external_id' => $update->update_id,
                 'payload' => [
                     'chat_id' => $chatId,
+                    'reply_chat_id' => $replyChatId,
                     'text' => $update->message_text,
+                    'reply' => $reply,
                     'has_reply' => (bool) $reply,
                 ],
                 'status' => 'processed',
             ]);
+
+            if ($replyChatId && $reply) {
+                $this->sendReply($telegram, (string) $replyChatId, $reply, $event);
+            }
 
             $this->info("Telegram update {$updateId} processed.");
 
@@ -78,6 +80,43 @@ class TelegramProcessUpdate extends Command
             $this->error($exception->getMessage());
 
             return self::FAILURE;
+        }
+    }
+
+    private function sendReply(
+        TelegramBotClient $telegram,
+        string $replyChatId,
+        string $reply,
+        IntegrationEvent $event,
+    ): void {
+        try {
+            $telegram->sendMessage($replyChatId, $reply);
+
+            IntegrationEvent::query()->create([
+                'provider' => 'telegram',
+                'type' => 'report.sent',
+                'external_id' => $event->external_id,
+                'payload' => [
+                    'reply_chat_id' => $replyChatId,
+                    'source_event_id' => $event->id,
+                ],
+                'status' => 'processed',
+            ]);
+        } catch (\Throwable $exception) {
+            IntegrationEvent::query()->create([
+                'provider' => 'telegram',
+                'type' => 'report.send_failed',
+                'external_id' => $event->external_id,
+                'payload' => [
+                    'reply_chat_id' => $replyChatId,
+                    'reply' => $reply,
+                    'source_event_id' => $event->id,
+                ],
+                'status' => 'failed',
+                'error' => $exception->getMessage(),
+            ]);
+
+            $this->warn('Report was saved but Telegram send failed: '.$exception->getMessage());
         }
     }
 }
