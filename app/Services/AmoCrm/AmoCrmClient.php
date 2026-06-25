@@ -16,6 +16,7 @@ use AmoCRM\Filters\CompaniesFilter;
 use AmoCRM\Filters\ContactsFilter;
 use AmoCRM\Filters\LeadsFilter;
 use AmoCRM\Helpers\EntityTypesInterface;
+use AmoCRM\Exceptions\AmoCRMApiNoContentException;
 use AmoCRM\Models\CompanyModel;
 use AmoCRM\Models\ContactModel;
 use AmoCRM\Models\CustomFieldsValues\BaseCustomFieldValuesModel;
@@ -303,27 +304,14 @@ class AmoCrmClient
         }
 
         try {
-            $lead = $client->leads()->get(
-                (new LeadsFilter())
-                    ->setCustomFieldsValues([self::LEAD_FIELD_ID_CLIENT => $sellerId])
-                    ->setLimit(1),
-            )?->first();
-
-            if ($lead instanceof LeadModel) {
-                return $lead;
-            }
-        } catch (\Throwable $exception) {
-            report($exception);
-        }
-
-        try {
             $leads = $client->leads()->get(
                 (new LeadsFilter())
                     ->setQuery($sellerId)
                     ->setLimit(10),
             );
-        } catch (\Throwable $exception) {
-            report($exception);
+        } catch (AmoCRMApiNoContentException) {
+            $leads = null;
+        } catch (\Throwable) {
             $leads = null;
         }
 
@@ -346,9 +334,9 @@ class AmoCrmClient
             $lead = $client->leads()->getOne($leadId);
 
             return $lead instanceof LeadModel ? $lead : null;
-        } catch (\Throwable $exception) {
-            report($exception);
-
+        } catch (AmoCRMApiNoContentException) {
+            return null;
+        } catch (\Throwable) {
             return null;
         }
     }
@@ -379,8 +367,8 @@ class AmoCrmClient
                 if ($contact instanceof ContactModel) {
                     return $this->updateSellerContact($client, $contact->getId(), $seller);
                 }
-            } catch (\Throwable $exception) {
-                report($exception);
+            } catch (AmoCRMApiNoContentException) {
+            } catch (\Throwable) {
             }
         }
 
@@ -391,8 +379,9 @@ class AmoCrmClient
                         ->setQuery($query)
                         ->setLimit(1),
                 )?->first();
-            } catch (\Throwable $exception) {
-                report($exception);
+            } catch (AmoCRMApiNoContentException) {
+                $contact = null;
+            } catch (\Throwable) {
                 $contact = null;
             }
 
@@ -415,8 +404,8 @@ class AmoCrmClient
                 if ($company instanceof CompanyModel) {
                     return $this->updateSellerCompany($client, $company->getId(), $seller);
                 }
-            } catch (\Throwable $exception) {
-                report($exception);
+            } catch (AmoCRMApiNoContentException) {
+            } catch (\Throwable) {
             }
         }
 
@@ -435,8 +424,9 @@ class AmoCrmClient
                         ->setQuery($query)
                         ->setLimit(1),
                 )?->first();
-            } catch (\Throwable $exception) {
-                report($exception);
+            } catch (AmoCRMApiNoContentException) {
+                $company = null;
+            } catch (\Throwable) {
                 $company = null;
             }
 
@@ -460,9 +450,9 @@ class AmoCrmClient
             )?->first();
 
             return $company instanceof CompanyModel ? $company : null;
-        } catch (\Throwable $exception) {
-            report($exception);
-
+        } catch (AmoCRMApiNoContentException) {
+            return null;
+        } catch (\Throwable) {
             return null;
         }
     }
