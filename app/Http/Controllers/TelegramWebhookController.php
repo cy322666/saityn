@@ -7,6 +7,7 @@ use App\Models\TelegramUpdate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 class TelegramWebhookController extends Controller
@@ -67,6 +68,12 @@ class TelegramWebhookController extends Controller
 
     private function startBackgroundProcessor(string $updateId): void
     {
+        if (app()->runningUnitTests()) {
+            Artisan::call('telegram:process-update', ['update_id' => $updateId]);
+
+            return;
+        }
+
         if (! function_exists('exec')) {
             Log::warning('Telegram background processor cannot start because exec is disabled.', [
                 'update_id' => $updateId,
