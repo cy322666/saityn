@@ -34,12 +34,12 @@ class TelegramBotClient
 
     public function getUpdates(int $offset, int $limit = 10, int $timeout = 0): array
     {
-        return $this->request('getUpdates', [
+        return $this->post('getUpdates', [
             'offset' => $offset,
             'limit' => $limit,
             'timeout' => $timeout,
             'allowed_updates' => ['message', 'edited_message'],
-        ], 'GET');
+        ]);
     }
 
     /**
@@ -111,7 +111,6 @@ class TelegramBotClient
         $command = [
             (string) config('services.telegram.curl_binary', '/usr/bin/curl'),
             '-sS',
-            '-4',
             '--retry',
             '3',
             '--retry-delay',
