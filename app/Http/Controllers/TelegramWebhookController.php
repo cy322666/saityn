@@ -85,14 +85,15 @@ class TelegramWebhookController extends Controller
         $php = (string) config('services.telegram.php_cli_binary', 'php');
         $logFile = storage_path('logs/telegram-worker.log');
         $command = sprintf(
-            'cd %s && %s artisan telegram:process-update %s >> %s 2>&1 &',
+            'cd %s && nohup %s artisan telegram:process-update %s </dev/null >> %s 2>&1 & echo $!',
             escapeshellarg(base_path()),
             escapeshellcmd($php),
             escapeshellarg($updateId),
             escapeshellarg($logFile),
         );
 
-        exec($command);
+        $output = [];
+        exec($command, $output);
 
         IntegrationEvent::query()->create([
             'provider' => 'telegram',
@@ -101,12 +102,14 @@ class TelegramWebhookController extends Controller
             'payload' => [
                 'command' => $command,
                 'log_file' => $logFile,
+                'pid' => $output[0] ?? null,
             ],
             'status' => 'processed',
         ]);
 
         Log::info('Telegram background processor dispatched.', [
             'update_id' => $updateId,
+            'pid' => $output[0] ?? null,
         ]);
     }
 }
