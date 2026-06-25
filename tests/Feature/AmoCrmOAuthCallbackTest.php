@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AmoCrmToken;
 use App\Services\AmoCrm\AmoCrmClient;
+use App\Services\AmoCrm\AmoCrmTokenStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -41,5 +42,21 @@ class AmoCrmOAuthCallbackTest extends TestCase
             'account_base_domain' => 'example.amocrm.ru',
             'token_type' => 'Bearer',
         ]);
+    }
+
+    public function test_token_store_can_use_configured_long_lived_token(): void
+    {
+        config([
+            'services.amocrm.base_domain' => 'https://TheSaitunLtd.amocrm.ru/',
+            'services.amocrm.long_lived_token' => 'long-lived-token',
+        ]);
+
+        $token = app(AmoCrmTokenStore::class)->forDomain();
+
+        $this->assertNotNull($token);
+        $this->assertFalse($token->exists);
+        $this->assertSame('thesaitunltd.amocrm.ru', $token->account_base_domain);
+        $this->assertSame('long-lived-token', $token->access_token);
+        $this->assertNull($token->refresh_token);
     }
 }

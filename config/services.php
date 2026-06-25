@@ -50,6 +50,7 @@ return [
         'base_domain' => env('AMOCRM_BASE_DOMAIN'),
         'client_id' => env('AMOCRM_CLIENT_ID'),
         'client_secret' => env('AMOCRM_CLIENT_SECRET'),
+        'long_lived_token' => env('AMOCRM_LONG_LIVED_TOKEN'),
         'redirect_uri' => env('AMOCRM_REDIRECT_URI', env('APP_URL').'/amocrm/oauth/callback'),
         'max_export_batch' => env('AMOCRM_MAX_EXPORT_BATCH', 100),
         'pipeline_id' => env('AMOCRM_PIPELINE_ID'),

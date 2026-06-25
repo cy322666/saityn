@@ -44,9 +44,28 @@ class AmoCrmTokenStore
             return null;
         }
 
-        return AmoCrmToken::query()
+        $normalizedDomain = $this->normalizeDomain($baseDomain);
+        $storedToken = AmoCrmToken::query()
             ->where('account_base_domain', $this->normalizeDomain($baseDomain))
             ->first();
+
+        if ($storedToken) {
+            return $storedToken;
+        }
+
+        $longLivedToken = config('services.amocrm.long_lived_token');
+
+        if (! $longLivedToken) {
+            return null;
+        }
+
+        return AmoCrmToken::make([
+            'account_base_domain' => $normalizedDomain,
+            'access_token' => $longLivedToken,
+            'refresh_token' => null,
+            'token_type' => 'Bearer',
+            'expires_at' => null,
+        ]);
     }
 
     public function normalizeDomain(string $baseDomain): string
