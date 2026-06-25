@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\TelegramUpdate;
+use App\Services\Support\CommandLock;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 
@@ -12,7 +13,22 @@ class TelegramProcessPending extends Command
 
     protected $description = 'Process stored Telegram updates that have not been handled yet.';
 
-    public function handle(): int
+    public function handle(CommandLock $lock): int
+    {
+        if (! $lock->acquire('telegram-process-pending')) {
+            $this->info('Telegram pending processor already running.');
+
+            return self::SUCCESS;
+        }
+
+        try {
+            return $this->process();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function process(): int
     {
         $limit = max(1, (int) $this->option('limit'));
         $updates = TelegramUpdate::query()

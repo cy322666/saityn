@@ -5,6 +5,7 @@ namespace App\Services\Export;
 use App\Models\IntegrationEvent;
 use App\Models\Seller;
 use App\Services\AmoCrm\AmoCrmClient;
+use App\Services\Support\CommandLock;
 use AmoCRM\Exceptions\AmoCRMApiErrorResponseException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -14,12 +15,33 @@ class AmoLeadExporter
 {
     public function __construct(
         private readonly AmoCrmClient $amoCrm,
+        private readonly CommandLock $lock,
     ) {
     }
 
     public function exportPending(int $count): AmoLeadExportResult
     {
         $count = max(1, min($count, (int) config('services.amocrm.max_export_batch', 100)));
+
+        if (! $this->lock->acquire('amocrm-export')) {
+            return new AmoLeadExportResult(
+                requested: $count,
+                selected: 0,
+                exported: 0,
+                failed: 0,
+                error: 'Выгрузка уже выполняется, повторный запуск пропущен.',
+            );
+        }
+
+        try {
+            return $this->runExportPending($count);
+        } finally {
+            $this->lock->release();
+        }
+    }
+
+    private function runExportPending(int $count): AmoLeadExportResult
+    {
         $sellers = $this->reservePendingSellers($count);
 
         if ($sellers->isEmpty()) {
@@ -89,6 +111,7 @@ class AmoLeadExporter
             $sellers = Seller::query()
                 ->where('is_exported', false)
                 ->orderBy('id')
+                ->lockForUpdate()
                 ->limit($count)
                 ->get();
 

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\IntegrationEvent;
 use App\Models\TelegramUpdate;
+use App\Services\Support\CommandLock;
 use App\Services\Telegram\TelegramBotClient;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -14,7 +15,22 @@ class TelegramPollUpdates extends Command
 
     protected $description = 'Poll Telegram updates and process bot commands without a webhook.';
 
-    public function handle(TelegramBotClient $telegram): int
+    public function handle(TelegramBotClient $telegram, CommandLock $lock): int
+    {
+        if (! $lock->acquire('telegram-poll-updates')) {
+            $this->info('Telegram polling already running.');
+
+            return self::SUCCESS;
+        }
+
+        try {
+            return $this->poll($telegram);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function poll(TelegramBotClient $telegram): int
     {
         $limit = max(1, min(100, (int) $this->option('limit')));
         $offset = $this->nextOffset();

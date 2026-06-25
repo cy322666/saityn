@@ -19,12 +19,20 @@ class AmoLeadExportResult
     public function message(): string
     {
         if ($this->selected === 0) {
-            return implode(PHP_EOL, [
+            $lines = [
                 'Отчет по выгрузке amoCRM',
                 "Запрошено: {$this->requested}",
                 'Найдено: 0',
-                'Статус: нет невыгруженных записей в sellers.',
-            ]);
+            ];
+
+            if ($this->error) {
+                $lines[] = 'Ошибка: '.$this->error;
+                $lines[] = 'Статус: завершено с ошибками.';
+            } else {
+                $lines[] = 'Статус: нет невыгруженных записей в sellers.';
+            }
+
+            return implode(PHP_EOL, $lines);
         }
 
         $lines = [
