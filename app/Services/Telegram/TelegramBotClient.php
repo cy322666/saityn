@@ -72,11 +72,7 @@ class TelegramBotClient
     private function request(string $method, array $payload = [], string $httpMethod = 'POST'): array
     {
         if (! app()->runningUnitTests()) {
-            try {
-                return $this->curlRequest($method, $payload, $httpMethod);
-            } catch (\Throwable $exception) {
-                return $this->shellCurlRequest($method, $payload, $httpMethod, $exception);
-            }
+            return $this->shellCurlRequest($method, $payload, $httpMethod);
         }
 
         return $this->httpRequest($method, $payload);
@@ -101,7 +97,7 @@ class TelegramBotClient
     ): array {
         if (! function_exists('proc_open')) {
             throw new RuntimeException(
-                'Telegram cURL failed and proc_open is disabled: '.$previousException?->getMessage(),
+                'Telegram shell curl cannot start because proc_open is disabled.',
                 previous: $previousException,
             );
         }
