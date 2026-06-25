@@ -1108,7 +1108,7 @@ class AmoCrmClient
 
     private function addUrlField(CustomFieldsValuesCollection $fields, int $fieldId, mixed $value): void
     {
-        $this->addCustomField($fields, (new UrlCustomFieldValuesModel())->setFieldId($fieldId), $value);
+        $this->addCustomField($fields, (new UrlCustomFieldValuesModel())->setFieldId($fieldId), $this->normalizeUrl($value));
     }
 
     private function addUrlFieldByCode(CustomFieldsValuesCollection $fields, string $fieldCode, mixed $value): void
@@ -1144,6 +1144,14 @@ class AmoCrmClient
 
         if ($value === null) {
             return;
+        }
+
+        if ($field instanceof TextCustomFieldValuesModel) {
+            $value = mb_substr($value, 0, 255);
+        }
+
+        if ($field instanceof TextareaCustomFieldValuesModel || $field instanceof StreetAddressCustomFieldValuesModel) {
+            $value = mb_substr($value, 0, 5000);
         }
 
         $field->setValues(

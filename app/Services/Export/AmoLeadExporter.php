@@ -5,6 +5,7 @@ namespace App\Services\Export;
 use App\Models\IntegrationEvent;
 use App\Models\Seller;
 use App\Services\AmoCrm\AmoCrmClient;
+use AmoCRM\Exceptions\AmoCRMApiErrorResponseException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -52,7 +53,7 @@ class AmoLeadExporter
             } catch (Throwable $exception) {
                 $failed++;
                 $seller->forceFill(['is_exported' => false])->save();
-                $errors[] = 'seller '.($seller->seller_id ?: $seller->id).': '.$exception->getMessage();
+                $errors[] = 'seller '.($seller->seller_id ?: $seller->id).': '.$this->exceptionMessage($exception);
             }
         }
 
@@ -111,5 +112,48 @@ class AmoLeadExporter
             'payload' => $payload,
             'status' => str_contains($type, 'failed') || str_contains($type, 'errors') ? 'failed' : 'processed',
         ]);
+    }
+
+    private function exceptionMessage(Throwable $exception): string
+    {
+        if ($exception instanceof AmoCRMApiErrorResponseException) {
+            $details = $this->flattenValidationErrors($exception->getValidationErrors());
+
+            if ($details !== []) {
+                return $exception->getMessage().': '.implode('; ', array_slice($details, 0, 5));
+            }
+        }
+
+        return $exception->getMessage();
+    }
+
+    /**
+     * @return string[]
+     */
+    private function flattenValidationErrors(array $errors, string $prefix = ''): array
+    {
+        $result = [];
+
+        foreach ($errors as $key => $value) {
+            $path = $prefix === '' ? (string) $key : "{$prefix}.{$key}";
+
+            if (is_array($value)) {
+                $message = $value['detail'] ?? $value['title'] ?? $value['message'] ?? null;
+
+                if (is_string($message) && $message !== '') {
+                    $result[] = "{$path}: {$message}";
+                }
+
+                $result = array_merge($result, $this->flattenValidationErrors($value, $path));
+
+                continue;
+            }
+
+            if (is_scalar($value) && $value !== '') {
+                $result[] = "{$path}: {$value}";
+            }
+        }
+
+        return array_values(array_unique($result));
     }
 }
