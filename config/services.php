@@ -37,9 +37,12 @@ return [
 
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'api_base_url' => env('TELEGRAM_API_BASE_URL', 'https://api.telegram.org'),
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
         'command_chat_id' => env('TELEGRAM_COMMAND_CHAT_ID'),
         'php_cli_binary' => env('PHP_CLI_BINARY', 'php'),
+        'connect_timeout' => env('TELEGRAM_CONNECT_TIMEOUT', 20),
+        'timeout' => env('TELEGRAM_TIMEOUT', 60),
     ],
 
     'amocrm' => [

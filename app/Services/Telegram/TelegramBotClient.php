@@ -81,12 +81,16 @@ class TelegramBotClient
             ];
         }
 
-        return Http::baseUrl("https://api.telegram.org/bot{$token}")
+        $baseUrl = rtrim((string) config('services.telegram.api_base_url', 'https://api.telegram.org'), '/');
+        $connectTimeout = max(1, (int) config('services.telegram.connect_timeout', 20));
+        $timeout = max($connectTimeout, (int) config('services.telegram.timeout', 60));
+
+        return Http::baseUrl("{$baseUrl}/bot{$token}")
             ->acceptJson()
             ->asJson()
             ->withOptions($options)
-            ->retry(2, 500)
-            ->connectTimeout(5)
-            ->timeout(20);
+            ->retry(2, 1000)
+            ->connectTimeout($connectTimeout)
+            ->timeout($timeout);
     }
 }
