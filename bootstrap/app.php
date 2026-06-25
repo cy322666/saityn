@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         App\Console\Commands\ExportOneSellerToAmoCrm::class,
         App\Console\Commands\ImportSellers::class,
+        App\Console\Commands\TelegramPollUpdates::class,
         App\Console\Commands\TelegramProcessPending::class,
         App\Console\Commands\TelegramProcessUpdate::class,
         App\Console\Commands\TelegramResendReports::class,

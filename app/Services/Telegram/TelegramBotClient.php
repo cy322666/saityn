@@ -32,6 +32,16 @@ class TelegramBotClient
         return $this->post('deleteWebhook');
     }
 
+    public function getUpdates(int $offset, int $limit = 10, int $timeout = 0): array
+    {
+        return $this->post('getUpdates', [
+            'offset' => $offset,
+            'limit' => $limit,
+            'timeout' => $timeout,
+            'allowed_updates' => ['message', 'edited_message'],
+        ]);
+    }
+
     /**
      * @param array<int, array{command: string, description: string}> $commands
      * @param array<string, mixed>|null $scope

@@ -208,4 +208,67 @@ class TelegramWebhookTest extends TestCase
             'error' => null,
         ]);
     }
+
+    public function test_polling_fetches_and_processes_upload_commands(): void
+    {
+        config([
+            'services.telegram.command_chat_id' => '-5452931046',
+            'services.amocrm.base_domain' => 'example.amocrm.ru',
+            'services.amocrm.max_export_batch' => 100,
+        ]);
+
+        $seller = Seller::create([
+            'seller_id' => 'seller-poll-1',
+            'deal_name' => 'Polling Lead',
+            'director_full_name' => 'Polling Client',
+        ]);
+
+        $this->mock(TelegramBotClient::class)
+            ->shouldReceive('getUpdates')
+            ->once()
+            ->with(0, 10, 0)
+            ->andReturn([
+                'ok' => true,
+                'result' => [[
+                    'update_id' => 20001,
+                    'message' => [
+                        'chat' => ['id' => -5452931046],
+                        'text' => '/upload@flowdyone_bot 1',
+                    ],
+                ]],
+            ])
+            ->shouldReceive('sendMessage')
+            ->once()
+            ->withArgs(fn (string $chatId, string $text) => $chatId === '-5452931046'
+                && str_contains($text, 'Отчет по выгрузке amoCRM')
+                && str_contains($text, 'Успешно загружено: 1'))
+            ->andReturn(['ok' => true]);
+
+        $this->mock(AmoCrmClient::class)
+            ->shouldReceive('createLeadFromSeller')
+            ->once()
+            ->withArgs(fn (Seller $exportedSeller) => $exportedSeller->is($seller))
+            ->andReturn([
+                'lead_id' => 401,
+                'contact_id' => 501,
+                'company_id' => 601,
+                'action' => 'created',
+            ]);
+
+        $this->artisan('telegram:poll-updates', ['--limit' => 10])
+            ->expectsOutput('Polled 1 Telegram updates.')
+            ->expectsOutput('Processing Telegram update 20001...')
+            ->assertSuccessful();
+
+        $this->assertDatabaseHas(TelegramUpdate::class, [
+            'update_id' => '20001',
+            'message_chat_id' => '-5452931046',
+            'message_text' => '/upload@flowdyone_bot 1',
+        ]);
+        $this->assertDatabaseHas(Seller::class, [
+            'seller_id' => 'seller-poll-1',
+            'is_exported' => true,
+            'lead_id' => '401',
+        ]);
+    }
 }
