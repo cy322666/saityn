@@ -41,6 +41,7 @@ return [
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
         'command_chat_id' => env('TELEGRAM_COMMAND_CHAT_ID'),
         'php_cli_binary' => env('PHP_CLI_BINARY', 'php'),
+        'curl_binary' => env('TELEGRAM_CURL_BINARY', '/usr/bin/curl'),
         'connect_timeout' => env('TELEGRAM_CONNECT_TIMEOUT', 20),
         'timeout' => env('TELEGRAM_TIMEOUT', 60),
     ],
