@@ -26,12 +26,12 @@ class TelegramWebhookController extends Controller
             response()->json(['ok' => true])->send();
             fastcgi_finish_request();
 
-            $this->storeAndDispatch($payload);
+            $this->storeAndDispatch($payload, shouldDispatch: true);
 
             exit;
         }
 
-        $this->storeAndDispatch($payload);
+        $this->storeAndDispatch($payload, shouldDispatch: app()->runningUnitTests());
 
         return response()->json(['ok' => true]);
     }
@@ -39,7 +39,7 @@ class TelegramWebhookController extends Controller
     /**
      * @param array<string, mixed> $payload
      */
-    private function storeAndDispatch(array $payload): void
+    private function storeAndDispatch(array $payload, bool $shouldDispatch): void
     {
         $message = data_get($payload, 'message') ?? data_get($payload, 'edited_message');
         $chatId = data_get($message, 'chat.id');
@@ -54,7 +54,7 @@ class TelegramWebhookController extends Controller
                 'message_chat_id' => $chatId,
                 'message_text' => $text,
                 'payload' => $payload,
-                'processed_at' => Carbon::now(),
+                'processed_at' => null,
             ],
         );
 
@@ -78,10 +78,14 @@ class TelegramWebhookController extends Controller
                 'status' => 'ignored',
             ]);
 
+            $update->forceFill(['processed_at' => Carbon::now()])->save();
+
             return;
         }
 
-        $this->startBackgroundProcessor($update->update_id);
+        if ($shouldDispatch) {
+            $this->startBackgroundProcessor($update->update_id);
+        }
     }
 
     private function startBackgroundProcessor(string $updateId): void
