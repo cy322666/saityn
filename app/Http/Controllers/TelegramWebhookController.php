@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\IntegrationEvent;
 use App\Models\TelegramUpdate;
-use App\Services\Telegram\TelegramBotClient;
-use App\Services\Telegram\TelegramCommandHandler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -13,11 +11,6 @@ use Illuminate\Support\Facades\Log;
 
 class TelegramWebhookController extends Controller
 {
-    public function __construct(
-        private readonly TelegramBotClient $telegram,
-        private readonly TelegramCommandHandler $commands,
-    ) {}
-
     public function __invoke(Request $request): JsonResponse
     {
         $expectedSecret = config('services.telegram.webhook_secret');
@@ -67,34 +60,46 @@ class TelegramWebhookController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        defer(fn () => $this->processCommandAfterResponse(
-            $update->update_id,
-            $chatId,
-            is_string($text) ? $text : null,
-            $commandChatId,
-        ));
+        $this->startBackgroundProcessor($update->update_id);
 
         return response()->json(['ok' => true]);
     }
 
-    private function processCommandAfterResponse(
-        string $updateId,
-        ?string $chatId,
-        ?string $text,
-        ?string $commandChatId,
-    ): void {
-        try {
-            $reply = $this->commands->handle($chatId, $text);
-            $replyChatId = $commandChatId ?: $chatId;
-
-            if ($replyChatId && $reply) {
-                $this->telegram->sendMessage($replyChatId, $reply);
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('Telegram command processing failed', [
+    private function startBackgroundProcessor(string $updateId): void
+    {
+        if (! function_exists('exec')) {
+            Log::warning('Telegram background processor cannot start because exec is disabled.', [
                 'update_id' => $updateId,
-                'message' => $exception->getMessage(),
             ]);
+
+            return;
         }
+
+        $php = (string) config('services.telegram.php_cli_binary', 'php');
+        $logFile = storage_path('logs/telegram-worker.log');
+        $command = sprintf(
+            'cd %s && %s artisan telegram:process-update %s >> %s 2>&1 &',
+            escapeshellarg(base_path()),
+            escapeshellcmd($php),
+            escapeshellarg($updateId),
+            escapeshellarg($logFile),
+        );
+
+        exec($command);
+
+        IntegrationEvent::query()->create([
+            'provider' => 'telegram',
+            'type' => 'command.dispatched',
+            'external_id' => $updateId,
+            'payload' => [
+                'command' => $command,
+                'log_file' => $logFile,
+            ],
+            'status' => 'processed',
+        ]);
+
+        Log::info('Telegram background processor dispatched.', [
+            'update_id' => $updateId,
+        ]);
     }
 }
