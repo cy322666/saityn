@@ -111,6 +111,12 @@ class TelegramBotClient
         $command = [
             (string) config('services.telegram.curl_binary', '/usr/bin/curl'),
             '-sS',
+            '-4',
+            '--retry',
+            '3',
+            '--retry-delay',
+            '2',
+            '--retry-connrefused',
             '--connect-timeout',
             $connectTimeout,
             '-m',
