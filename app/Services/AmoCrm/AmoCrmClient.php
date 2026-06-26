@@ -14,7 +14,6 @@ use AmoCRM\Collections\LinksCollection;
 use AmoCRM\Collections\NotesCollection;
 use AmoCRM\Filters\CompaniesFilter;
 use AmoCRM\Filters\ContactsFilter;
-use AmoCRM\Filters\LeadsFilter;
 use AmoCRM\Helpers\EntityTypesInterface;
 use AmoCRM\Exceptions\AmoCRMApiNoContentException;
 use AmoCRM\Models\CompanyModel;
@@ -144,41 +143,30 @@ class AmoCrmClient
     public function createLeadFromSeller(Seller $seller, ?string $baseDomain = null): array
     {
         $client = $this->authorizedClient($baseDomain);
-        $existingLead = $this->findSellerLead($client, $seller);
-        $contact = $this->findOrCreateSellerContact($client, $seller);
-        $company = $this->findOrCreateSellerCompany($client, $seller);
+        $contact = $this->optionalSellerContact($client, $seller);
+        $company = $this->optionalSellerCompany($client, $seller);
 
         if ($contact && $company) {
             $this->linkContactToCompany($client, $contact->getId(), $company->getId());
         }
 
-        if ($existingLead) {
-            $lead = $this->toSellerLeadModel($seller)
-                ->setId($existingLead->getId());
+        $lead = $this->toSellerLeadModel($seller);
 
-            $client->leads()->updateOne($lead);
-            $leadId = $existingLead->getId();
-            $action = 'updated';
-        } else {
-            $lead = $this->toSellerLeadModel($seller);
-
-            if ($contact) {
-                $lead->setContacts((new ContactsCollection())->add(
-                    (new ContactModel())->setId($contact->getId())->setIsMain(true),
-                ));
-            }
-
-            if ($company) {
-                $lead->setCompany((new CompanyModel())->setId($company->getId()));
-            }
-
-            $createdLead = $client->leads()->addOne($lead);
-            $leadId = $createdLead->getId();
-            $action = 'created';
+        if ($contact) {
+            $lead->setContacts((new ContactsCollection())->add(
+                (new ContactModel())->setId($contact->getId())->setIsMain(true),
+            ));
         }
 
+        if ($company) {
+            $lead->setCompany((new CompanyModel())->setId($company->getId()));
+        }
+
+        $createdLead = $client->leads()->addOne($lead);
+        $leadId = $createdLead->getId();
+
         if ($leadId) {
-            $this->addSellerNote($leadId, $this->sellerNoteText($seller), $baseDomain);
+            $this->optionalSellerNote($leadId, $this->sellerNoteText($seller), $baseDomain);
             $this->linkSellerEntitiesToLead($client, $leadId, $contact?->getId(), $company?->getId());
         }
 
@@ -186,8 +174,34 @@ class AmoCrmClient
             'lead_id' => $leadId,
             'contact_id' => $contact?->getId(),
             'company_id' => $company?->getId(),
-            'action' => $action,
+            'action' => 'created',
         ];
+    }
+
+    private function optionalSellerContact(AmoCRMApiClient $client, Seller $seller): ?ContactModel
+    {
+        try {
+            return $this->findOrCreateSellerContact($client, $seller);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function optionalSellerCompany(AmoCRMApiClient $client, Seller $seller): ?CompanyModel
+    {
+        try {
+            return $this->findOrCreateSellerCompany($client, $seller);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function optionalSellerNote(int $leadId, string $text, ?string $baseDomain = null): void
+    {
+        try {
+            $this->addSellerNote($leadId, $text, $baseDomain);
+        } catch (\Throwable) {
+        }
     }
 
     public function moveLeadToConfiguredPipeline(int $leadId, ?string $baseDomain = null): void
@@ -287,75 +301,6 @@ class AmoCrmClient
         $this->applySellerLeadCustomFields($lead, $seller);
 
         return $lead;
-    }
-
-    private function findSellerLead(AmoCRMApiClient $client, Seller $seller): ?LeadModel
-    {
-        $storedLead = $this->storedLead($client, $seller->lead_id);
-
-        if ($storedLead) {
-            return $storedLead;
-        }
-
-        $sellerId = $this->formatFieldValue($seller->seller_id);
-
-        if (! $sellerId) {
-            return null;
-        }
-
-        try {
-            $leads = $client->leads()->get(
-                (new LeadsFilter())
-                    ->setQuery($sellerId)
-                    ->setLimit(10),
-            );
-        } catch (AmoCRMApiNoContentException) {
-            $leads = null;
-        } catch (\Throwable) {
-            $leads = null;
-        }
-
-        foreach ($leads?->all() ?? [] as $candidate) {
-            if ($candidate instanceof LeadModel && $this->leadHasSellerId($candidate, $sellerId)) {
-                return $candidate;
-            }
-        }
-
-        return null;
-    }
-
-    private function storedLead(AmoCRMApiClient $client, ?int $leadId): ?LeadModel
-    {
-        if (! $leadId) {
-            return null;
-        }
-
-        try {
-            $lead = $client->leads()->getOne($leadId);
-
-            return $lead instanceof LeadModel ? $lead : null;
-        } catch (AmoCRMApiNoContentException) {
-            return null;
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private function leadHasSellerId(LeadModel $lead, string $sellerId): bool
-    {
-        foreach ($lead->getCustomFieldsValues()?->all() ?? [] as $field) {
-            if (! $field instanceof BaseCustomFieldValuesModel || $field->getFieldId() !== self::LEAD_FIELD_ID_CLIENT) {
-                continue;
-            }
-
-            foreach ($field->getValues()?->all() ?? [] as $value) {
-                if ((string) $value->getValue() === $sellerId) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     private function findOrCreateSellerContact(AmoCRMApiClient $client, Seller $seller): ?ContactModel
