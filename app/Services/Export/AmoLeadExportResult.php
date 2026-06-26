@@ -21,7 +21,8 @@ class AmoLeadExportResult
     public function message(): string
     {
         $lines = [
-            'Отчет по выгрузке amoCRM',
+            'Отчет по выгрузке',
+            '',
             "Запрошено: {$this->requested}",
             "Успешно загружено: {$this->exported}",
             "Ошибок: {$this->failed}",

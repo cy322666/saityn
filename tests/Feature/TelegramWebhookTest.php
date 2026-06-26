@@ -127,7 +127,7 @@ class TelegramWebhookTest extends TestCase
 
         Http::assertSent(fn ($request) => $request->url() === 'https://api.telegram.org/bottelegram-token/sendMessage'
             && $request['chat_id'] === '555'
-            && str_contains($request['text'], 'Отчет по выгрузке amoCRM')
+            && str_contains($request['text'], "Отчет по выгрузке\n\nЗапрошено: 2")
             && str_contains($request['text'], 'Запрошено: 2')
             && str_contains($request['text'], 'Успешно загружено: 2')
             && str_contains($request['text'], 'Ошибок: 0')
@@ -293,7 +293,7 @@ class TelegramWebhookTest extends TestCase
             ->shouldReceive('sendMessage')
             ->once()
             ->withArgs(fn (string $chatId, string $text) => $chatId === '-5452931046'
-                && str_contains($text, 'Отчет по выгрузке amoCRM')
+                && str_contains($text, "Отчет по выгрузке\n\nЗапрошено: 1")
                 && str_contains($text, 'Успешно загружено: 1')
                 && str_contains($text, 'Всего в БД: 1')
                 && str_contains($text, 'Ждут выгрузки: 0'))
