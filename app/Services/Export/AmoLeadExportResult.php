@@ -13,35 +13,17 @@ class AmoLeadExportResult
         public readonly ?string $error = null,
         public readonly int $created = 0,
         public readonly int $updated = 0,
+        public readonly int $totalSellers = 0,
+        public readonly int $pendingSellers = 0,
     ) {
     }
 
     public function message(): string
     {
-        if ($this->selected === 0) {
-            $lines = [
-                'Отчет по выгрузке amoCRM',
-                "Запрошено: {$this->requested}",
-                'Найдено: 0',
-            ];
-
-            if ($this->error) {
-                $lines[] = 'Ошибка: '.$this->error;
-                $lines[] = 'Статус: завершено с ошибками.';
-            } else {
-                $lines[] = 'Статус: нет невыгруженных записей в sellers.';
-            }
-
-            return implode(PHP_EOL, $lines);
-        }
-
         $lines = [
             'Отчет по выгрузке amoCRM',
             "Запрошено: {$this->requested}",
-            "Взято из БД: {$this->selected}",
             "Успешно загружено: {$this->exported}",
-            "Создано новых сделок: {$this->created}",
-            "Обновлено дублей: {$this->updated}",
             "Ошибок: {$this->failed}",
         ];
 
@@ -49,7 +31,16 @@ class AmoLeadExportResult
             $lines[] = 'Ошибка: '.$this->error;
         }
 
-        $lines[] = $this->failed > 0 ? 'Статус: завершено с ошибками.' : 'Статус: успешно.';
+        if ($this->failed > 0 || $this->error) {
+            $lines[] = 'Статус: завершено с ошибками';
+        } elseif ($this->selected === 0) {
+            $lines[] = 'Статус: нет невыгруженных записей';
+        } else {
+            $lines[] = 'Статус: успешно';
+        }
+
+        $lines[] = "Всего в БД: {$this->totalSellers}";
+        $lines[] = "Ждут выгрузки: {$this->pendingSellers}";
 
         return implode(PHP_EOL, $lines);
     }

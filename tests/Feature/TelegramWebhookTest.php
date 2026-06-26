@@ -128,9 +128,14 @@ class TelegramWebhookTest extends TestCase
         Http::assertSent(fn ($request) => $request->url() === 'https://api.telegram.org/bottelegram-token/sendMessage'
             && $request['chat_id'] === '555'
             && str_contains($request['text'], 'Отчет по выгрузке amoCRM')
+            && str_contains($request['text'], 'Запрошено: 2')
             && str_contains($request['text'], 'Успешно загружено: 2')
-            && str_contains($request['text'], 'Создано новых сделок: 1')
-            && str_contains($request['text'], 'Обновлено дублей: 1')
+            && str_contains($request['text'], 'Ошибок: 0')
+            && str_contains($request['text'], 'Статус: успешно')
+            && str_contains($request['text'], 'Всего в БД: 3')
+            && str_contains($request['text'], 'Ждут выгрузки: 1')
+            && ! str_contains($request['text'], 'Создано новых сделок')
+            && ! str_contains($request['text'], 'Обновлено дублей')
             && ! str_contains($request['text'], 'ID сделок amoCRM'));
     }
 
@@ -176,6 +181,9 @@ class TelegramWebhookTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request['text'], 'Запрошено: 10')
             && str_contains($request['text'], 'Успешно загружено: 10')
+            && str_contains($request['text'], 'Ошибок: 0')
+            && str_contains($request['text'], 'Всего в БД: 12')
+            && str_contains($request['text'], 'Ждут выгрузки: 2')
             && ! str_contains($request['text'], 'ID сделок amoCRM'));
     }
 
@@ -286,7 +294,9 @@ class TelegramWebhookTest extends TestCase
             ->once()
             ->withArgs(fn (string $chatId, string $text) => $chatId === '-5452931046'
                 && str_contains($text, 'Отчет по выгрузке amoCRM')
-                && str_contains($text, 'Успешно загружено: 1'))
+                && str_contains($text, 'Успешно загружено: 1')
+                && str_contains($text, 'Всего в БД: 1')
+                && str_contains($text, 'Ждут выгрузки: 0'))
             ->andReturn(['ok' => true]);
 
         $this->mock(AmoCrmClient::class)

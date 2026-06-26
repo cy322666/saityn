@@ -24,12 +24,16 @@ class AmoLeadExporter
         $count = max(1, min($count, (int) config('services.amocrm.max_export_batch', 100)));
 
         if (! $this->lock->acquire('amocrm-export')) {
+            [$totalSellers, $pendingSellers] = $this->sellerCounts();
+
             return new AmoLeadExportResult(
                 requested: $count,
                 selected: 0,
                 exported: 0,
                 failed: 0,
                 error: 'Выгрузка уже выполняется, повторный запуск пропущен.',
+                totalSellers: $totalSellers,
+                pendingSellers: $pendingSellers,
             );
         }
 
@@ -45,7 +49,16 @@ class AmoLeadExporter
         $sellers = $this->reservePendingSellers($count);
 
         if ($sellers->isEmpty()) {
-            return new AmoLeadExportResult($count, 0, 0, 0);
+            [$totalSellers, $pendingSellers] = $this->sellerCounts();
+
+            return new AmoLeadExportResult(
+                requested: $count,
+                selected: 0,
+                exported: 0,
+                failed: 0,
+                totalSellers: $totalSellers,
+                pendingSellers: $pendingSellers,
+            );
         }
 
         $leadIds = [];
@@ -90,6 +103,8 @@ class AmoLeadExporter
             'errors' => $errors,
         ]);
 
+        [$totalSellers, $pendingSellers] = $this->sellerCounts();
+
         return new AmoLeadExportResult(
             requested: $count,
             selected: $sellers->count(),
@@ -99,7 +114,20 @@ class AmoLeadExporter
             error: $errors === [] ? null : implode(PHP_EOL, array_slice($errors, 0, 3)),
             created: $created,
             updated: $updated,
+            totalSellers: $totalSellers,
+            pendingSellers: $pendingSellers,
         );
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private function sellerCounts(): array
+    {
+        return [
+            Seller::query()->count(),
+            Seller::query()->where('is_exported', false)->count(),
+        ];
     }
 
     /**
