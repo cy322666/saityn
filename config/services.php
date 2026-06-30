@@ -55,6 +55,8 @@ return [
         'max_export_batch' => env('AMOCRM_MAX_EXPORT_BATCH', 100),
         'pipeline_id' => env('AMOCRM_PIPELINE_ID'),
         'status_id' => env('AMOCRM_STATUS_ID'),
+        'closed_pipeline_id' => env('AMOCRM_CLOSED_PIPELINE_ID', env('AMOCRM_PIPELINE_ID')),
+        'closed_status_id' => env('AMOCRM_CLOSED_STATUS_ID', 143),
     ],
 
 ];

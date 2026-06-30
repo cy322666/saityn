@@ -14,6 +14,8 @@ use AmoCRM\Collections\LinksCollection;
 use AmoCRM\Collections\NotesCollection;
 use AmoCRM\Filters\CompaniesFilter;
 use AmoCRM\Filters\ContactsFilter;
+use AmoCRM\Filters\LeadsFilter;
+use AmoCRM\Filters\LinksFilter;
 use AmoCRM\Helpers\EntityTypesInterface;
 use AmoCRM\Exceptions\AmoCRMApiNoContentException;
 use AmoCRM\Models\CompanyModel;
@@ -150,6 +152,23 @@ class AmoCrmClient
             $this->linkContactToCompany($client, $contact->getId(), $company->getId());
         }
 
+        $reactivatedLeadId = $this->reactivateClosedSellerLead(
+            $client,
+            $seller,
+            $contact?->getId(),
+            $company?->getId(),
+            $baseDomain,
+        );
+
+        if ($reactivatedLeadId) {
+            return [
+                'lead_id' => $reactivatedLeadId,
+                'contact_id' => $contact?->getId(),
+                'company_id' => $company?->getId(),
+                'action' => 'updated',
+            ];
+        }
+
         $lead = $this->toSellerLeadModel($seller);
 
         if ($contact) {
@@ -176,6 +195,134 @@ class AmoCrmClient
             'company_id' => $company?->getId(),
             'action' => 'created',
         ];
+    }
+
+    private function reactivateClosedSellerLead(
+        AmoCRMApiClient $client,
+        Seller $seller,
+        ?int $contactId,
+        ?int $companyId,
+        ?string $baseDomain = null,
+    ): ?int {
+        $closedLead = $this->findClosedSellerLead($client, $seller, $contactId, $companyId);
+
+        if (! $closedLead?->getId()) {
+            return null;
+        }
+
+        $lead = $this->toSellerLeadModel($seller)->setId($closedLead->getId());
+        $updatedLead = $client->leads()->updateOne($lead);
+        $leadId = $updatedLead->getId() ?: $closedLead->getId();
+
+        $this->optionalSellerNote($leadId, $this->sellerNoteText($seller), $baseDomain);
+        $this->linkSellerEntitiesToLead($client, $leadId, $contactId, $companyId);
+
+        return $leadId;
+    }
+
+    private function findClosedSellerLead(AmoCRMApiClient $client, Seller $seller, ?int $contactId, ?int $companyId): ?LeadModel
+    {
+        $leadIds = $this->sellerClosedLeadCandidateIds($client, $seller, $contactId, $companyId);
+
+        if ($leadIds === []) {
+            return null;
+        }
+
+        foreach (array_chunk($leadIds, 50) as $chunk) {
+            try {
+                $leads = $client->leads()->get(
+                    (new LeadsFilter())
+                        ->setIds($chunk)
+                        ->setStatuses([[
+                            'pipeline_id' => $this->closedPipelineId(),
+                            'status_id' => $this->closedStatusId(),
+                        ]])
+                        ->setOrder('updated_at', 'desc')
+                        ->setLimit(count($chunk)),
+                );
+            } catch (AmoCRMApiNoContentException) {
+                $leads = null;
+            } catch (\Throwable) {
+                $leads = null;
+            }
+
+            if ($leads) {
+                foreach ($leads as $lead) {
+                    if ($lead instanceof LeadModel && $this->isConfiguredClosedLead($lead)) {
+                        return $lead;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return int[]
+     */
+    private function sellerClosedLeadCandidateIds(AmoCRMApiClient $client, Seller $seller, ?int $contactId, ?int $companyId): array
+    {
+        $ids = array_filter([(int) $seller->lead_id]);
+
+        if ($contactId) {
+            $ids = array_merge(
+                $ids,
+                $this->linkedLeadIds($client, (new ContactModel())->setId($contactId), EntityTypesInterface::CONTACTS),
+            );
+        }
+
+        if ($companyId) {
+            $ids = array_merge(
+                $ids,
+                $this->linkedLeadIds($client, (new CompanyModel())->setId($companyId), EntityTypesInterface::COMPANIES),
+            );
+        }
+
+        return array_values(array_unique(array_filter(array_map('intval', $ids))));
+    }
+
+    /**
+     * @return int[]
+     */
+    private function linkedLeadIds(AmoCRMApiClient $client, ContactModel|CompanyModel $entity, string $entityType): array
+    {
+        try {
+            $links = $client->{$entityType}()->getLinks(
+                $entity,
+                (new LinksFilter())->setToEntityType(EntityTypesInterface::LEADS),
+            );
+        } catch (AmoCRMApiNoContentException) {
+            return [];
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach ($links as $link) {
+            if ($link->getToEntityType() === EntityTypesInterface::LEADS && $link->getToEntityId()) {
+                $ids[] = $link->getToEntityId();
+            }
+        }
+
+        return $ids;
+    }
+
+    private function isConfiguredClosedLead(LeadModel $lead): bool
+    {
+        return $lead->getPipelineId() === $this->closedPipelineId()
+            && $lead->getStatusId() === $this->closedStatusId();
+    }
+
+    private function closedPipelineId(): int
+    {
+        return (int) config('services.amocrm.closed_pipeline_id');
+    }
+
+    private function closedStatusId(): int
+    {
+        return (int) config('services.amocrm.closed_status_id', LeadModel::LOST_STATUS_ID);
     }
 
     private function optionalSellerContact(AmoCRMApiClient $client, Seller $seller): ?ContactModel

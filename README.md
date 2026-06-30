@@ -64,6 +64,8 @@ AMOCRM_REDIRECT_URI="${APP_URL}/amocrm/oauth/callback"
 AMOCRM_MAX_EXPORT_BATCH=100
 AMOCRM_PIPELINE_ID=10666522
 AMOCRM_STATUS_ID=84063902
+AMOCRM_CLOSED_PIPELINE_ID=10666522
+AMOCRM_CLOSED_STATUS_ID=143
 ```
 
 ## Telegram
@@ -97,7 +99,12 @@ The bot can export queued database records to amoCRM. Supported commands:
 /выгрузить 10
 ```
 
-The number in the command is the amount of pending records to take from `amo_export_records`.
+The number in the command is the amount of pending records to take from the database.
+
+If an existing contact or company already has a closed lost deal in `AMOCRM_CLOSED_PIPELINE_ID`
+with `AMOCRM_CLOSED_STATUS_ID` (`143` by default), the exporter returns that deal to
+`AMOCRM_PIPELINE_ID` / `AMOCRM_STATUS_ID` instead of creating a new deal. If no such deal is
+found, a new deal is created.
 
 ## amoCRM
 
